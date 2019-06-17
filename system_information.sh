@@ -29,6 +29,7 @@ do
 		--backtitle "System Information Dialog Script" \
 		--title "Menu" \
 		--clear \
+		--ok-label "OK" \
 		--cancel-label "Exit" \
 		--menu "Please select:" ${HEIGHT} ${WIDTH} ${ROWS} \
 			"1"  "Host Information" \
