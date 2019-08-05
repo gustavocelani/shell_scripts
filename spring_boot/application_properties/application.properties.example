@@ -1,0 +1,33 @@
+
+# Server General Parameters
+spring.application.name:            Server_Name
+server.port:                        80
+
+# Access Log
+server.tomcat.accesslog.directory:  /var/log/server_name_logs
+server.tomcat.accesslog.enabled:    true
+server.tomcat.accesslog.pattern:    common
+
+# MongoDB
+spring.data.mongodb.host:           192.168.9.9
+spring.data.mongodb.port:           27017
+spring.data.mongodb.uri:            mongodb://192.168.9.9/server_name_uri
+spring.data.mongodb.database:       server_name_db
+
+# Server HTTPS
+security.require-ssl:               true
+server.ssl.enabled:                 true
+server.ssl.protocol:                TLS
+
+# Server Keystore
+server.ssl.key-store-type:          PKCS12
+server.ssl.key-store:               src/main/resources/keystore/Server_Name_Keystore.p12
+server.ssl.key-store-password:      change_it
+server.ssl.key-alias:               SERVER_NAME_CRT
+
+# Trust Keystore for Mutual TLS Authentication
+server.ssl.client-auth:             need
+server.ssl.trust-store-type:        JKS
+server.ssl.trust-store:             src/main/resources/keystore/Server_CA_TrustStore.jks
+server.ssl.trust-store-password:    change_it
+
