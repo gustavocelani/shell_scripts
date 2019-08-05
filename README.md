@@ -1,29 +1,8 @@
-# Shell Script Dialog
+# Shell Scripts
 
-## Dialog Types
+A shell script is a computer program designed to be run by the Unix shell, a command-line interpreter. The various dialects of shell scripts are considered to be scripting languages. Typical operations performed by shell scripts include file manipulation, program execution, and printing text. A script which sets up the environment, runs the program, and does any necessary cleanup, logging, etc. is called a wrapper.
 
-**Dialog**       | **Option**    | **Description**
-|----------------|---------------|----------------|
-Build List       | --buildlist   | Displays two lists, side-by-side. The list on the left contains unselected items, the list on the right selected items. The user can move items from one list to the other.
-Calendar         | --calendar    | Displays a calendar and allow the user to select a date.
-Checklist        | --checklist   | Presents a list of choices and allow the user to select one or more items.
-Directory Select | --dselect     | Displays a directory selection dialog.
-Edit Box         | --editbox     | Displays a rudimentary text file editor.
-Form             | --form        | Allows the user to enter text into multiple fields.
-File Select      | --fselect     | A file selection dialog.
-Gauge            | --gauge       | Displays a progress indicator showing the percentage of completion.
-Info Box         | --infobox     | Displays a message (with an optional timed pause) and terminates.
-Input Box        | --inputbox    | Prompts the user to enter/edit a text field.
-Menu Box         | --menubox     | Displays a list of choices.
-Message Box      | --msgbox      | Displays a text message and waits for the user to respond.
-Password Box     | --passwordbox | Similar to an input box, but hides the user's entry.
-Pause            | --pause       | Displays a text message and a countdown timer. The dialog terminates when the timer runs out or when the user presses either the OK or Cancel button.
-Program Box      | --programbox  | Displays the output of a piped command. When the command completes, the dialog waits for the user to press an OK button.
-Progress Box     | --progressbox | Similar to the program box except the dialog terminates when the piped command completes, rather than waiting for the user to press OK.
-Radio List       | --radiolist   | Displays a list of choices and allows the user to select a single item. Any previously selected item becomes unselected.
-Range Box        | --rangebox    | Allows the user to select a numerical value from within a specified range using a keyboard-based slider.
-Tail Box         | --tailbox     | Displays a text file with real-time updates. Works like the command tail -f.
-Text Box         | --textbox     | A simple text file viewer. Supports many of the same keyboard commands as less.
-Time Box         | --timebox     | A dialog for entering a time of day.
-Tree View        | --treeview    | Displays a list of items in a tree-shaped hierarchy.
-Yes/No Box       | --yesno       | Displays a text message and gives the user a chance to respond with either "Yes" or "No.".
+The typical Unix/Linux/POSIX-compliant installation includes the KornShell (ksh) in several possible versions such as ksh88, Korn Shell '93 and others. The oldest shell still in common use is the Bourne shell (sh); Unix systems invariably also include the C shell (csh), Bash (bash), a Remote Shell (rsh), a Secure Shell (ssh) for SSL telnet connections, and a shell which is a main component of the Tcl/Tk installation usually called tclsh; wish is a GUI-based Tcl/Tk shell.
+
+The C and Tcl shells have syntax quite similar to that of said programming languages, and the Korn shells and Bash are developments of the Bourne shell, which is based on the ALGOL language with elements of a number of others added as well. On the other hand, the various shells plus tools like awk, sed, grep, and BASIC, Lisp, C and so forth contributed to the Perl programming language.
+
