@@ -7,17 +7,17 @@
 #    Description:  Simple LXD Environment General Script.
 #                  Run as super user.
 #
-#       Features:  - Generate Base Debian Container
-#                  - Generate Router and Networks
-#                  - Generate Clones from Base Debian Container
-#                  - Remove Containers
-#                  - Test Containers
-#                  - List Containers
+#       Features:  Generate Base Debian Container
+#                  Generate All Environment
+#                  Remove Base Debian Container
+#                  Remove All Environment
+#                  Test Environment
+#                  List Containers
 #
-#       Packages:  - lxd
-#                  - dialog
+#       Packages:  lxd
+#                  dialog
 #
-#        Version:  1.0
+#        Version:  1.1
 #        Created:  07/08/2019 20:58:06 PM
 #       Revision:  1
 #
@@ -66,19 +66,6 @@ print_logo()
 }
 
 #
-# Display message on dialog message box
-# $1: Title
-# $2: Message
-#
-display_on_dialog()
-{
-	dialog \
-		--title "$1" \
-		--no-collapse \
-		--msgbox "$2" ${HEIGHT} ${WIDTH}
-}
-
-#
 # Generates a Debian Base Container
 #
 generate_base_container()
@@ -90,10 +77,10 @@ generate_base_container()
     lxc init images:debian/stretch ${BASE_NAME}
 
     echo "Starting [ ${BASE_NAME} ]"
-    lxc start ${BASE_NAME}
+    start_container ${BASE_NAME}
 
     echo ""
-    for COUNT in {15..0}; do printf "\rWaiting to [ ${BASE_NAME} ] start... %02d" "$COUNT"; sleep 1; done; echo ""
+    for COUNT in {15..0}; do printf "\rWaiting to [ ${BASE_NAME} ] start... [ %02d ]" "$COUNT"; sleep 1; done; echo ""
 
     echo ""
     echo "Updating [ ${BASE_NAME} ]"
@@ -101,15 +88,17 @@ generate_base_container()
 
     echo ""
     echo "Installing custom packages on [ ${BASE_NAME} ]"
-    lxc exec ${BASE_NAME} -- /usr/bin/apt install -y tcpdump apt-utils aptitude net-tools inetutils-ping tracerout iptables htop bind9-host dnsutils rsyslog links man vim openssh-server
+    lxc exec ${BASE_NAME} -- /usr/bin/apt install -y tcpdump apt-utils aptitude net-tools inetutils-ping traceroute iptables htop bind9-host dnsutils rsyslog links vim openssh-server
 
     echo ""
     echo "Setting up timezone to [ America/Sao_Paulo ]"
     lxc exec ${BASE_NAME} -- timedatectl set-timezone "America/Sao_Paulo"
 
+    configure_ssh_server ${BASE_NAME}
+
     echo ""
     echo "Powering Off [ ${BASE_NAME} ]"
-    lxc exec ${BASE_NAME} -- /sbin/poweroff
+    power_off_container ${BASE_NAME}
 }
 
 #
@@ -136,8 +125,10 @@ generate_router_container()
     lxc network attach ${NETWORK_BR} ${R_NAME} eth2
 
     echo "Starting [ ${R_NAME} ]"
-    lxc start ${R_NAME}
-    for COUNT in {15..0}; do printf "\rWaiting to [ ${R_NAME} ] start... %02d" "$COUNT"; sleep 1; done; echo ""
+    start_container ${R_NAME}
+    for COUNT in {15..0}; do printf "\rWaiting to [ ${R_NAME} ] start... [ %02d ]" "$COUNT"; sleep 1; done; echo ""
+
+    configure_ssh_server ${R_NAME}
 
     echo ""
     echo "Pushing configuration files..."
@@ -157,11 +148,11 @@ generate_router_container()
 }
 
 #
-# Generates a clone container from Base
-# $1: Clone Container Name
-# $2: Clone Container Network Name
+# Generates a host container from Base
+# $1: Host Container Name
+# $2: Host Container Network Name
 #
-generate_clone()
+generate_host_container()
 {
     clear
     print_logo
@@ -174,15 +165,19 @@ generate_clone()
     lxc network attach $2 $1 eth0
 
     echo "Starting [ $1 ]"
-    lxc start $1
-    for COUNT in {15..0}; do printf "\rWaiting to [ $1 ] start... %02d" "$COUNT"; sleep 1; done; echo ""
+    start_container $1
+    for COUNT in {15..0}; do printf "\rWaiting to [ $1 ] start... [ %02d ]" "$COUNT"; sleep 1; done; echo ""
+
+    echo ""
+    echo "Setting up SSH Server for [ $1 ]"
+    echo "Generating SSH RSA 4096 Key Pair Locally"
+
+    configure_ssh_server $1
 
     echo ""
     echo "Pushing configuration files..."
     echo "./conf/$1/interfaces    --->   $1/etc/network/interfaces"
     lxc file push ./conf/$1/interfaces $1/etc/network/interfaces
-
-
 }
 
 #
@@ -195,10 +190,10 @@ remove_container()
     print_logo
 
     echo "Send power off signal to [ $1 ]"
-    lxc exec $1 -- /sbin/poweroff
+    power_off_container $1
 
     echo ""
-    for COUNT in {9..0}; do printf "\rWaiting to $1 power off... %02d" "$COUNT"; sleep 1; done; echo ""
+    for COUNT in {9..0}; do printf "\rWaiting to [ $1 ] power off... [ %02d ]" "$COUNT"; sleep 1; done; echo ""
 
     echo ""
     echo "Removing [ $1 ]"
@@ -244,8 +239,97 @@ test_environment_network()
     lxc exec ${A1_NAME} -- /bin/ping6 -c 3 2001:db8:2018:B::100
     printf "\n\n"
     lxc exec ${A1_NAME} -- /bin/ping6 -c 3 2001:db8:2018:B::10
+}
 
-    sleep 3
+#
+# Power off a Container
+# $1 Container Name
+#
+power_off_container()
+{
+    lxc exec $1 -- /sbin/poweroff
+}
+
+#
+# Start a Container
+# $1 Container Name
+#
+start_container()
+{
+    lxc start $1
+}
+
+#
+# Configure SSH Server
+# $1 Container Name
+#
+configure_ssh_server()
+{
+    echo ""
+    ssh-keygen -t rsa -b 4096 -N '' -f ./conf/$1/$1_key
+    echo ""
+
+    echo ""
+    echo "Creating /root/.ssh directory"
+    lxc exec $1 -- mkdir -p /root/.ssh
+    echo "./conf/$1/$1_key.pub                --->   $1/root/.ssh/"
+    lxc file push ./conf/$1/$1_key.pub $1/root/.ssh/authorized_keys
+    #echo "Copying [ $1_key.pub ] to [ authorized_keys ]"
+    #lxc exec $1 -- cat /root/.ssh/$1_key.pub >> /root/.ssh/authorized_keys
+
+    echo "./conf/$1/sshd_config   --->   $1/etc/ssh/sshd_config"
+    lxc file push ./conf/$1/sshd_config $1/etc/ssh/sshd_config
+
+    echo ""
+    echo "Restarting SSH Server Service"
+    lxc exec $1 -- service ssh restart
+}
+
+#
+# Restart Environment
+#
+restart_environment()
+{
+    clear
+    print_logo
+
+    echo "Powering off [ ${R_NAME} ]"
+    power_off_container ${R_NAME}
+    echo "Powering off [ ${A1_NAME} ]"
+    power_off_container ${A1_NAME}
+    echo "Powering off [ ${A2_NAME} ]"
+    power_off_container ${A2_NAME}
+    echo "Powering off [ ${B1_NAME} ]"
+    power_off_container ${B1_NAME}
+
+    echo ""
+    for COUNT in {9..0}; do printf "\rWaiting for environment power off... [ %02d ]" "$COUNT"; sleep 1; done; echo ""
+
+    echo ""
+    echo "Starting [ ${R_NAME} ]"
+    start_container ${R_NAME}
+    echo "Starting [ ${A1_NAME} ]"
+    start_container ${A1_NAME}
+    echo "Starting [ ${A2_NAME} ]"
+    start_container ${A2_NAME}
+    echo "Starting [ ${B1_NAME} ]"
+    start_container ${B1_NAME}
+
+    echo ""
+    for COUNT in {9..0}; do printf "\rWaiting for environment start... [ %02d ]" "$COUNT"; sleep 1; done; echo ""
+}
+
+#
+# List Environment
+#
+environment_list()
+{
+    clear
+    print_logo
+
+    lxc list
+    echo ""
+    read -p "Press enter to continue..."
 }
 
 #
@@ -275,17 +359,16 @@ do
 	EXIT_STATUS=$?
 	exec 3>&-
 
+    clear
+	print_logo
+
 	# Check cancel actions
 	case $EXIT_STATUS in
 		$DIALOG_CANCEL)
-			clear
-			print_logo
 			printf "\nProgram terminated.\n\n"
 			exit 1
 			;;
 		$DIALOG_ESC)
-			clear
-			print_logo
 			printf "\nProgram aborted.\n\n" >&2
 			exit 1
 		;;
@@ -294,49 +377,42 @@ do
 	# Check Selection
 	case $SELECTION in
 		0)
-			clear
-			print_logo
 			printf "\nProgram terminated.\n\n"
 		;;
 		1)
-			clear
-			print_logo
 			generate_base_container
+            environment_list
 		;;
 		2)
 			generate_base_container
 			generate_router_container
-			generate_clone ${A1_NAME} ${NETWORK_AR}
-			generate_clone ${A2_NAME} ${NETWORK_AR}
-			generate_clone ${B1_NAME} ${NETWORK_BR}
-			display_on_dialog "Generate Environment" "All Actions Done"
+			generate_host_container ${A1_NAME} ${NETWORK_AR}
+			generate_host_container ${A2_NAME} ${NETWORK_AR}
+			generate_host_container ${B1_NAME} ${NETWORK_BR}
+            restart_environment
+            environment_list
 		;;
 		3)
-			clear
-			print_logo
 			remove_container ${BASE_NAME}
-			display_on_dialog "Remove [ ${BASE_NAME} ]" "All Actions Done"
+			echo ""
+            read -p "Press enter to continue..."
 		;;
 		4)
-			clear
-			print_logo
 			remove_container ${BASE_NAME}
 			remove_container ${R_NAME}
 			remove_container ${A1_NAME}
 			remove_container ${A2_NAME}
 			remove_container ${B1_NAME}
 			remove_networks
-			display_on_dialog "Remove Environment" "All Actions Done"
+            environment_list
 		;;
 		5)
-			clear
-			print_logo
-			test_containers_network
-			display_on_dialog "Test Environment Network" "All Actions Done"
+			test_environment_network
+			echo ""
+            read -p "Press enter to continue..."
 		;;
 		6)
-			display_on_dialog "List Containers" $(lxc list)
+            environment_list
 		;;
 	esac
 done
-
