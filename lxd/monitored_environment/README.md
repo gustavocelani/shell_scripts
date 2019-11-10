@@ -2,9 +2,9 @@
 
 ## Environment
 
-```
-        TODO
-```
+
+![Alt text](ip_map.jpg?raw=true "IP Map")
+
 
 ## Script Details
 

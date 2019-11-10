@@ -61,7 +61,6 @@ generate_container_base()
     echo "Initializing [ ${NAME_BASE} ] with Debian Stretch"
     lxc init images:debian/stretch ${NAME_BASE}
 
-    echo "Starting [ ${NAME_BASE} ]"
     start_container ${NAME_BASE}
 
     echo ""
@@ -79,8 +78,6 @@ generate_container_base()
     echo "Setting up timezone to [ America/Sao_Paulo ]"
     lxc exec ${NAME_BASE} -- timedatectl set-timezone "America/Sao_Paulo"
 
-    echo ""
-    echo "Powering Off [ ${NAME_BASE} ]"
     power_off_container ${NAME_BASE}
 }
 
@@ -133,8 +130,6 @@ generate_container_firewall()
     echo "Attaching network [ ${NETWORK_WEB} ] on interface [ eth3 ]"
     lxc network attach ${NETWORK_WEB} ${NAME_FIREWALL} eth3
 
-    echo ""
-    echo "Starting [ ${NAME_FIREWALL} ]"
     start_container ${NAME_FIREWALL}
     for COUNT in {9..0}; do printf "\rWaiting to [ ${NAME_FIREWALL} ] start... [ %02d ]" "$COUNT"; sleep 1; done; echo ""
 
@@ -175,8 +170,6 @@ generate_default_container()
     echo "Attaching network [ $2 ] on interface [ eth0 ]"
     lxc network attach $2 $1 eth0
 
-    echo ""
-    echo "Starting [ $1 ]"
     start_container $1
     for COUNT in {9..0}; do printf "\rWaiting to [ $1 ] start... [ %02d ]" "$COUNT"; sleep 1; done; echo ""
 
@@ -199,9 +192,7 @@ remove_container()
     clear
     print_logo
 
-    echo "Send power off signal to [ $1 ]"
     power_off_container $1
-
     for COUNT in {5..0}; do printf "\rWaiting to [ $1 ] power off... [ %02d ]" "$COUNT"; sleep 1; done; echo ""
 
     echo "Removing [ $1 ]"
@@ -229,6 +220,8 @@ remove_network()
 #
 power_off_container()
 {
+    echo ""
+    echo "Turning off [ $1 ]"
     lxc exec $1 -- /sbin/poweroff
 }
 
@@ -239,6 +232,8 @@ power_off_container()
 #
 start_container()
 {
+    echo ""
+    echo "Starting [ $1 ]"
     lxc start $1
 }
 
@@ -256,7 +251,77 @@ environment_list()
 
     lxc list
     echo ""
+    lxc network list
+
+    echo ""
     read -p "Press enter to continue..."
+}
+
+
+#
+# Remove Environment
+#
+remove_environment()
+{
+    clear
+    print_logo
+
+    echo ""
+    echo "Remove Environment"
+
+    remove_container ${NAME_FIREWALL}
+    remove_container ${NAME_WWW1}
+    remove_container ${NAME_WWW2}
+    remove_container ${NAME_LOG}
+    remove_container ${NAME_GERENCIA}
+    remove_container ${NAME_SSH}
+    remove_container ${NAME_PROXY}
+
+    remove_network ${NETWORK_DMZ}
+    remove_network ${NETWORK_SERVERS}
+    remove_network ${NETWORK_WEB}
+}
+
+
+#
+# Stop Environment
+#
+stop_environment()
+{
+    clear
+    print_logo
+
+    echo ""
+    echo "Stop Environment"
+
+    power_off_container ${NAME_FIREWALL}
+    power_off_container ${NAME_WWW1}
+    power_off_container ${NAME_WWW2}
+    power_off_container ${NAME_LOG}
+    power_off_container ${NAME_GERENCIA}
+    power_off_container ${NAME_SSH}
+    power_off_container ${NAME_PROXY}
+}
+
+
+#
+# Start Environment
+#
+start_environment()
+{
+    clear
+    print_logo
+
+    echo ""
+    echo "Start Environment"
+
+    start_container ${NAME_FIREWALL}
+    start_container ${NAME_WWW1}
+    start_container ${NAME_WWW2}
+    start_container ${NAME_LOG}
+    start_container ${NAME_GERENCIA}
+    start_container ${NAME_SSH}
+    start_container ${NAME_PROXY}
 }
 
 
@@ -270,24 +335,29 @@ print_logo
 ################################################################################
 # Remove Environment
 ################################################################################
+# remove_environment
+# exit
 
-# remove_container ${NAME_FIREWALL}
-# remove_container ${NAME_WWW1}
-# remove_container ${NAME_WWW2}
-# remove_container ${NAME_LOG}
-# remove_container ${NAME_GERENCIA}
-# remove_container ${NAME_SSH}
-# remove_container ${NAME_PROXY}
 
-# remove_network ${NETWORK_DMZ}
-# remove_network ${NETWORK_SERVERS}
-# remove_network ${NETWORK_WEB}
+################################################################################
+# Stop Environment
+################################################################################
+# stop_environment
+# exit
+
+
+################################################################################
+# Start Environment
+################################################################################
+# start_environment
+# exit
 
 
 ################################################################################
 # Generate Container Base
 ################################################################################
 # generate_container_base
+# exit
 
 
 ################################################################################
@@ -441,4 +511,3 @@ generate_default_container ${NAME_PROXY} ${NETWORK_DMZ}
 
 environment_list
 echo ""
-
