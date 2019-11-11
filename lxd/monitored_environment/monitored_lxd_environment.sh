@@ -7,7 +7,7 @@
 #    Description:  Monitored LXD Environment General Script.
 #                  Run as super user.
 #
-#        Version:  1.0
+#        Version:  1.1
 #        Created:  08/10/2019 17:12:36 PM
 #       Revision:  1
 #
@@ -64,7 +64,7 @@ generate_container_base()
     start_container ${NAME_BASE}
 
     echo ""
-    for COUNT in {9..0}; do printf "\rWaiting to [ ${NAME_BASE} ] start... [ %02d ]" "$COUNT"; sleep 1; done; echo ""
+    for COUNT in {5..0}; do printf "\rWaiting to [ ${NAME_BASE} ] start... [ %02d ]" "$COUNT"; sleep 1; done; echo ""
 
     echo ""
     echo "Updating [ ${NAME_BASE} ]"
@@ -72,7 +72,7 @@ generate_container_base()
 
     echo ""
     echo "Installing custom packages on [ ${NAME_BASE} ]"
-    lxc exec ${NAME_BASE} -- /usr/bin/apt install -y tcpdump apt-utils aptitude net-tools inetutils-ping traceroute iptables htop bind9-host dnsutils rsyslog links vim
+    lxc exec ${NAME_BASE} -- /usr/bin/apt install -y tcpdump apt-utils aptitude net-tools inetutils-ping traceroute iptables htop bind9-host dnsutils links vim openssh-server rsyslog
 
     echo ""
     echo "Setting up timezone to [ America/Sao_Paulo ]"
@@ -95,13 +95,13 @@ generate_networks()
 
     echo ""
     echo "Generating network [ ${NETWORK_DMZ} ] ..."
-    lxc network create ${NETWORK_DMZ} ipv6.address=2001:db8:574:A::1/64 ipv4.address=10.0.10.1/24 ipv4.nat=false ipv4.dhcp=false
+    lxc network create ${NETWORK_DMZ} ipv6.address=2001:db8:574:A::1/64 ipv4.address=172.0.10.1/24 ipv4.nat=false ipv4.dhcp=false
 
     echo "Generating network [ ${NETWORK_SERVERS} ] ..."
-    lxc network create ${NETWORK_SERVERS} ipv6.address=2001:db8:574:B::1/64 ipv4.address=10.0.20.1/24 ipv4.nat=false ipv4.dhcp=false
+    lxc network create ${NETWORK_SERVERS} ipv6.address=2001:db8:574:B::1/64 ipv4.address=172.0.20.1/24 ipv4.nat=false ipv4.dhcp=false
 
     echo "Generating network [ ${NETWORK_WEB} ] ..."
-    lxc network create ${NETWORK_WEB} ipv6.address=2001:db8:574:C::1/64 ipv4.address=10.0.30.1/24 ipv4.nat=false ipv4.dhcp=false
+    lxc network create ${NETWORK_WEB} ipv6.address=2001:db8:574:C::1/64 ipv4.address=172.0.30.1/24 ipv4.nat=false ipv4.dhcp=false
 }
 
 
@@ -131,7 +131,7 @@ generate_container_firewall()
     lxc network attach ${NETWORK_WEB} ${NAME_FIREWALL} eth3
 
     start_container ${NAME_FIREWALL}
-    for COUNT in {9..0}; do printf "\rWaiting to [ ${NAME_FIREWALL} ] start... [ %02d ]" "$COUNT"; sleep 1; done; echo ""
+    for COUNT in {5..0}; do printf "\rWaiting to [ ${NAME_FIREWALL} ] start... [ %02d ]" "$COUNT"; sleep 1; done; echo ""
 
     echo ""
     echo "Pushing configuration files..."
@@ -141,47 +141,148 @@ generate_container_firewall()
     lxc file push ./conf/${NAME_FIREWALL}/sysctl.conf ${NAME_FIREWALL}/etc/sysctl.conf
     echo "./conf/${NAME_FIREWALL}/rc.local      --->   ${NAME_FIREWALL}/etc/rc.local"
     lxc file push ./conf/${NAME_FIREWALL}/rc.local ${NAME_FIREWALL}/etc/rc.local
+    echo "./conf/${NAME_FIREWALL}/sshd_config   --->   ${NAME_FIREWALL}/etc/ssh/sshd_config"
+    lxc file push ./conf/${NAME_FIREWALL}/sshd_config ${NAME_FIREWALL}/etc/ssh/sshd_config
 
     echo ""
     echo "Rebooting ${NAME_FIREWALL}"
     lxc exec ${NAME_FIREWALL} -- reboot
+
+    for COUNT in {3..0}; do printf "\rWaiting to [ $1 ] start... [ %02d ]" "$COUNT"; sleep 1; done; echo ""
+
+    echo ""
+    echo "Setting up NAT to between DMZ Network and eth0"
+    lxc exec ${NAME_FIREWALL} -- iptables -t nat -A POSTROUTING --source 172.0.10.0/24 --out-interface eth0 -j MASQUERADE
 }
 
 
 #
-# Generate Default Container
+# Generate Container
 #
 # $1: Container Name
 # $2: Network Name to be attached on eth0 interface
 #
-generate_default_container()
+generate_container()
 {
     clear
     print_logo
 
     echo ""
-	echo "Generate Container $1"
+	echo "Generate Container [ $1 ]"
 
     echo ""
     echo "Cloning [ ${NAME_BASE} ] to [ $1 ]"
     lxc copy ${NAME_BASE} $1
 
+    start_container $1
+    for COUNT in {5..0}; do printf "\rWaiting to [ $1 ] start... [ %02d ]" "$COUNT"; sleep 1; done; echo ""
+
+    echo ""
+    echo "Creating user [ $1_user ]"
+    lxc exec $1 -- adduser --disabled-password --gecos "" $1_user
+
+    echo ""
+    echo "Executing custom setup on [ $1 ]"
+    case $1 in
+        ${NAME_SSH})
+
+            echo ""
+            echo "Setting up user with password"
+            lxc exec $1 -- userdel $1_user
+            lxc exec $1 -- adduser $1_user
+
+            echo ""
+            echo "Installing fail2ban and libpam-google-authenticator"
+            lxc exec $1 -- /usr/bin/apt install -y fail2ban libpam-google-authenticator
+
+            echo ""
+            echo "Setting up SSH alias"
+            echo "./conf/$1/.bashrc    --->   $1/root/.bashrc"
+            lxc file push ./conf/$1/.bashrc $1/root/.bashrc
+            echo "./conf/$1/.bashrc    --->   $1/home/$1_user/.bashrc.alias"
+            lxc file push ./conf/$1/.bashrc $1/home/$1_user/
+            lxc exec $1 -- cat $1/home/$1_user/.bashrc.alias >> $1/home/$1_user/.bashrc
+
+            echo ""
+            echo "Setting up fail2ban"
+            echo "./conf/$1/jail.local    --->   $1/etc/fail2ban/"
+            lxc file push ./conf/$1/jail.local $1/etc/fail2ban/
+            echo "./conf/$1/fail2ban.local    --->   $1/etc/fail2ban/"
+            lxc file push ./conf/$1/fail2ban.local $1/etc/fail2ban/
+            echo "Restarting fail2ban service"
+            lxc exec $1 -- service fail2ban restart
+
+            echo ""
+            echo "Setting up libpam-google-authenticator"
+            echo "./conf/$1/sshd    --->   $1/etc/pam.d/sshd"
+            lxc file push ./conf/$1/sshd $1/etc/pam.d/sshd
+            echo "Starting libpam-google-authenticator"
+            lxc exec $1 -- runuser -l  $1_user -c 'google-authenticator'
+        ;;
+    esac
+
+    echo ""
+    echo "Pushing default configuration files..."
+    echo "./conf/$1/interfaces    --->   $1/etc/network/interfaces"
+    lxc file push ./conf/$1/interfaces $1/etc/network/interfaces
+    echo "./conf/$1/sshd_config   --->   $1/etc/ssh/sshd_config"
+    lxc file push ./conf/$1/sshd_config $1/etc/ssh/sshd_config
+
+    power_off_container $1
+    for COUNT in {3..0}; do printf "\rWaiting to [ $1 ] power off... [ %02d ]" "$COUNT"; sleep 1; done; echo ""
+
     echo ""
     echo "Attaching network [ $2 ] on interface [ eth0 ]"
     lxc network attach $2 $1 eth0
-
+    
     start_container $1
-    for COUNT in {9..0}; do printf "\rWaiting to [ $1 ] start... [ %02d ]" "$COUNT"; sleep 1; done; echo ""
-
-    echo ""
-    echo "Pushing configuration files..."
-    echo "./conf/$1/interfaces    --->   $1/etc/network/interfaces"
-    lxc file push ./conf/$1/interfaces $1/etc/network/interfaces
-
-    echo ""
-    echo "Rebooting [ $1 ]"
-    lxc exec $1 -- reboot
 }
+
+
+#
+# Configure_ssh_keys
+#
+configure_ssh_keys()
+{
+    for CONTAINER in ${NAME_SSH} ${NAME_WWW1} ${NAME_WWW2} ${NAME_PROXY} ${NAME_LOG} ${NAME_GERENCIA} ${NAME_FIREWALL}
+    do
+        clear
+        print_logo
+
+        echo ""
+        echo "Configuring SSH for [ ${CONTAINER} ]"
+
+        echo ""
+        echo "Generating Key Pair"
+        ssh-keygen -t rsa -b 4096 -N '' -f ./conf/${CONTAINER}/${CONTAINER}_key
+
+        echo ""
+        echo "Creating /${CONTAINER}_user/.ssh directory"
+        lxc exec ${CONTAINER} -- mkdir -p /${CONTAINER}_user/.ssh
+
+        echo ""
+        echo "./conf/${CONTAINER}/${CONTAINER}_key        --->   ${CONTAINER}/${CONTAINER}_user/.ssh/"
+        lxc file push ./conf/${CONTAINER}/${CONTAINER}_key ${CONTAINER}/${CONTAINER}_user/.ssh/
+        echo "./conf/${CONTAINER}/${CONTAINER}_key.pub    --->   ${CONTAINER}/${CONTAINER}_user/.ssh/"
+        lxc file push ./conf/${CONTAINER}/${CONTAINER}_key.pub ${CONTAINER}/${CONTAINER}_user/.ssh/
+        echo "./conf/${NAME_SSH}/${NAME_SSH}_key.pub   --->   ${CONTAINER}/${CONTAINER}_user/.ssh/authorized_keys"
+        lxc file push ./conf/${NAME_SSH}/${NAME_SSH}_key.pub ${CONTAINER}/${CONTAINER}_user/.ssh/authorized_keys
+
+        echo ""
+        echo "Setting up authorized_keys permission"
+        lxc exec ${CONTAINER} -- chown ${CONTAINER}_user:${CONTAINER}_user /${CONTAINER}_user/.ssh/${CONTAINER}_key
+        lxc exec ${CONTAINER} -- chown ${CONTAINER}_user:${CONTAINER}_user /${CONTAINER}_user/.ssh/${CONTAINER}_key.pub
+        lxc exec ${CONTAINER} -- chown ${CONTAINER}_user:${CONTAINER}_user /${CONTAINER}_user/.ssh/authorized_keys
+        lxc exec ${CONTAINER} -- chmod 0600 /${CONTAINER}_user/.ssh/authorized_keys
+
+        echo ""
+        echo "Restarting SSH Service"
+        lxc exec ${CONTAINER} -- service ssh restart
+        lxc exec ${CONTAINER} -- service sshd restart
+
+    done
+}
+
 
 #
 # Removes a container
@@ -193,7 +294,7 @@ remove_container()
     print_logo
 
     power_off_container $1
-    for COUNT in {5..0}; do printf "\rWaiting to [ $1 ] power off... [ %02d ]" "$COUNT"; sleep 1; done; echo ""
+    for COUNT in {3..0}; do printf "\rWaiting to [ $1 ] power off... [ %02d ]" "$COUNT"; sleep 1; done; echo ""
 
     echo "Removing [ $1 ]"
     lxc delete $1
@@ -243,9 +344,6 @@ start_container()
 #
 environment_list()
 {
-    echo ""
-    read -p "Press enter to continue..."
-
     clear
     print_logo
 
@@ -432,7 +530,7 @@ generate_container_firewall
 # IPv4:    172.0.30.10/24
 # IPv6:    2001:db8:574:C::10/64
 #
-generate_default_container ${NAME_WWW1} ${NETWORK_WEB}
+generate_container ${NAME_WWW1} ${NETWORK_WEB}
 
 #
 # Generate Container www2
@@ -444,7 +542,7 @@ generate_default_container ${NAME_WWW1} ${NETWORK_WEB}
 # IPv4:    172.0.30.20/24
 # IPv6:    2001:db8:574:C::20/64
 #
-generate_default_container ${NAME_WWW2} ${NETWORK_WEB}
+generate_container ${NAME_WWW2} ${NETWORK_WEB}
 
 
 ################################################################################
@@ -461,7 +559,7 @@ generate_default_container ${NAME_WWW2} ${NETWORK_WEB}
 # IPv4:    172.0.20.10/24
 # IPv6:    2001:db8:574:B::10/64
 #
-generate_default_container ${NAME_LOG} ${NETWORK_SERVERS}
+generate_container ${NAME_LOG} ${NETWORK_SERVERS}
 
 #
 # Generate Container Gerencia
@@ -473,7 +571,7 @@ generate_default_container ${NAME_LOG} ${NETWORK_SERVERS}
 # IPv4:    172.0.20.20/24
 # IPv6:    2001:db8:574:B::20/64
 #
-generate_default_container ${NAME_GERENCIA} ${NETWORK_SERVERS}
+generate_container ${NAME_GERENCIA} ${NETWORK_SERVERS}
 
 
 ################################################################################
@@ -490,7 +588,7 @@ generate_default_container ${NAME_GERENCIA} ${NETWORK_SERVERS}
 # IPv4:    172.0.10.10/24
 # IPv6:    2001:db8:574:A::10/64
 #
-generate_default_container ${NAME_SSH} ${NETWORK_DMZ}
+generate_container ${NAME_SSH} ${NETWORK_DMZ}
 
 #
 # Generate Container Proxy
@@ -502,7 +600,13 @@ generate_default_container ${NAME_SSH} ${NETWORK_DMZ}
 # IPv4:    172.0.10.20/24
 # IPv6:    2001:db8:574:A::20/64
 #
-generate_default_container ${NAME_PROXY} ${NETWORK_DMZ}
+generate_container ${NAME_PROXY} ${NETWORK_DMZ}
+
+
+################################################################################
+# SSH Keys Setup
+################################################################################
+configure_ssh_keys
 
 
 ################################################################################
