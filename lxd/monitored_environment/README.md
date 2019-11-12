@@ -46,7 +46,7 @@ $ ssh-www1
 $ ssh-www2
 ```
 
-### SSH Hardering
+### SSH Hardening
 
 * SSH Protol 2
 
@@ -71,4 +71,22 @@ $ ssh-www2
 	- Selected ban time
 	- 3 Max retry
 	- Alias to watch logs: `$ log-fail2ban`
+
+
+## WWW1 and WWW2
+
+This machines are on WEB network that has no access to internet under firewall rules. Each one provides a HTTP Web Server on port 80 powered by Nginx.
+
+
+## Proxy
+
+This machine is on DMZ network that has access to internet under firewall rules. It provides a HTTPS Reverse Proxy with Load Balancer on port 443 powered by Nginx.
+
+### Proxy Hardening
+
+* TLS over HTTP (HTTPS)
+
+* Load Balancer for WWW1 and WWW2
+
+* DDoS Prevention
 

@@ -184,6 +184,7 @@ generate_container()
     echo ""
     echo "Executing custom setup on [ $1 ]"
     case $1 in
+        ## SSH Container
         ${NAME_SSH})
 
             echo ""
@@ -218,6 +219,43 @@ generate_container()
             lxc file push ./conf/$1/sshd $1/etc/pam.d/sshd
             echo "Starting libpam-google-authenticator"
             lxc exec $1 -- runuser -l  $1_user -c 'google-authenticator'
+        ;;
+        
+        # WWW1 and WWW2 Containers
+        ${NAME_WWW1}|${NAME_WWW2})
+
+            echo ""
+            echo "Installing nginx"
+            lxc exec $1 -- /usr/bin/apt install -y nginx
+
+            echo ""
+            echo "Setting up Nginx HTTP Web Server"
+            echo "./conf/$1/default    --->   $1/etc/nginx/sites-enabled/"
+            lxc file push ./conf/$1/default $1/etc/nginx/sites-enabled/
+            echo "./conf/$1/index.html    --->   $1/usr/share/nginx/html/index.html"
+            lxc file push ./conf/$1/index.html $1/usr/share/nginx/html/index.html
+        ;;
+
+        # Proxy Containers
+        ${NAME_PROXY})
+
+            echo ""
+            echo "Installing nginx"
+            lxc exec $1 -- /usr/bin/apt install -y nginx
+
+            echo ""
+            echo "Creating Nginx Key Certificate Authority"
+            openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout ./conf/$1/$1_nginx.key -out ./conf/$1/$1_nginx.crt
+
+            echo ""
+            echo "Setting up Nginx HTTPS Reverse Proxy and Load Balancer"
+            lxc exec $1 -- mkdir /etc/nginx/ssl
+            echo "./conf/$1/$1_nginx.key    --->   $1/etc/nginx/ssl/"
+            lxc file push ./conf/$1/$1_nginx.key $1/etc/nginx/ssl/
+            echo "./conf/$1/$1_nginx.crt    --->   $1/etc/nginx/ssl/"
+            lxc file push ./conf/$1/$1_nginx.crt $1/etc/nginx/ssl/
+            echo "./conf/$1/default    --->   $1/etc/nginx/sites-enabled/"
+            lxc file push ./conf/$1/default $1/etc/nginx/sites-enabled/
         ;;
     esac
 
@@ -254,24 +292,24 @@ configure_ssh_keys()
 
         echo ""
         echo "Generating Key Pair"
-        ssh-keygen -t rsa -b 4096 -N '' -f ./conf/${CONTAINER}/${CONTAINER}_key
+        ssh-keygen -t rsa -b 4096 -N '' -f ./conf/${CONTAINER}/${CONTAINER}_ssh_key
 
         echo ""
         echo "Creating /${CONTAINER}_user/.ssh directory"
         lxc exec ${CONTAINER} -- mkdir -p /${CONTAINER}_user/.ssh
 
         echo ""
-        echo "./conf/${CONTAINER}/${CONTAINER}_key        --->   ${CONTAINER}/${CONTAINER}_user/.ssh/"
-        lxc file push ./conf/${CONTAINER}/${CONTAINER}_key ${CONTAINER}/${CONTAINER}_user/.ssh/
-        echo "./conf/${CONTAINER}/${CONTAINER}_key.pub    --->   ${CONTAINER}/${CONTAINER}_user/.ssh/"
-        lxc file push ./conf/${CONTAINER}/${CONTAINER}_key.pub ${CONTAINER}/${CONTAINER}_user/.ssh/
-        echo "./conf/${NAME_SSH}/${NAME_SSH}_key.pub   --->   ${CONTAINER}/${CONTAINER}_user/.ssh/authorized_keys"
-        lxc file push ./conf/${NAME_SSH}/${NAME_SSH}_key.pub ${CONTAINER}/${CONTAINER}_user/.ssh/authorized_keys
+        echo "./conf/${CONTAINER}/${CONTAINER}_ssh_key        --->   ${CONTAINER}/${CONTAINER}_user/.ssh/"
+        lxc file push ./conf/${CONTAINER}/${CONTAINER}_ssh_key ${CONTAINER}/${CONTAINER}_user/.ssh/
+        echo "./conf/${CONTAINER}/${CONTAINER}_ssh_key.pub    --->   ${CONTAINER}/${CONTAINER}_user/.ssh/"
+        lxc file push ./conf/${CONTAINER}/${CONTAINER}_ssh_key.pub ${CONTAINER}/${CONTAINER}_user/.ssh/
+        echo "./conf/${NAME_SSH}/${NAME_SSH}_ssh_key.pub   --->   ${CONTAINER}/${CONTAINER}_user/.ssh/authorized_keys"
+        lxc file push ./conf/${NAME_SSH}/${NAME_SSH}_ssh_key.pub ${CONTAINER}/${CONTAINER}_user/.ssh/authorized_keys
 
         echo ""
         echo "Setting up authorized_keys permission"
-        lxc exec ${CONTAINER} -- chown ${CONTAINER}_user:${CONTAINER}_user /${CONTAINER}_user/.ssh/${CONTAINER}_key
-        lxc exec ${CONTAINER} -- chown ${CONTAINER}_user:${CONTAINER}_user /${CONTAINER}_user/.ssh/${CONTAINER}_key.pub
+        lxc exec ${CONTAINER} -- chown ${CONTAINER}_user:${CONTAINER}_user /${CONTAINER}_user/.ssh/${CONTAINER}_ssh_key
+        lxc exec ${CONTAINER} -- chown ${CONTAINER}_user:${CONTAINER}_user /${CONTAINER}_user/.ssh/${CONTAINER}_ssh_key.pub
         lxc exec ${CONTAINER} -- chown ${CONTAINER}_user:${CONTAINER}_user /${CONTAINER}_user/.ssh/authorized_keys
         lxc exec ${CONTAINER} -- chmod 0600 /${CONTAINER}_user/.ssh/authorized_keys
 
