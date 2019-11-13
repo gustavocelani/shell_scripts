@@ -49,7 +49,7 @@ server {
 
     # Load Balancer using 'load_balancer' upstream
     location /www {
-        proxy_pass http://load_balancer;
+        proxy_pass https://load_balancer;
     }
 
     # Reverse proxy for WWW1 Web Server
