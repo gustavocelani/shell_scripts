@@ -1,0 +1,16 @@
+lxd/monitored_environment/conf/firewall/firewall_ssh_key
+lxd/monitored_environment/conf/firewall/firewall_ssh_key.pub
+lxd/monitored_environment/conf/gerencia/gerencia_ssh_key
+lxd/monitored_environment/conf/gerencia/gerencia_ssh_key.pub
+lxd/monitored_environment/conf/log/log_ssh_key
+lxd/monitored_environment/conf/log/log_ssh_key.pub
+lxd/monitored_environment/conf/proxy/proxy_nginx.crt
+lxd/monitored_environment/conf/proxy/proxy_nginx.key
+lxd/monitored_environment/conf/proxy/proxy_ssh_key
+lxd/monitored_environment/conf/proxy/proxy_ssh_key.pub
+lxd/monitored_environment/conf/ssh/ssh_ssh_key
+lxd/monitored_environment/conf/ssh/ssh_ssh_key.pub
+lxd/monitored_environment/conf/www1/www1_ssh_key
+lxd/monitored_environment/conf/www1/www1_ssh_key.pub
+lxd/monitored_environment/conf/www2/www2_ssh_key
+lxd/monitored_environment/conf/www2/www2_ssh_key.pub
