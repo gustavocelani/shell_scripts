@@ -7,7 +7,7 @@
 #    Description:  Monitored LXD Environment General Script.
 #                  Run as super user.
 #
-#        Version:  1.1
+#        Version:  1.2
 #        Created:  08/10/2019 17:12:36 PM
 #       Revision:  1
 #
@@ -134,6 +134,13 @@ generate_container_firewall()
     for COUNT in {5..0}; do printf "\rWaiting to [ ${NAME_FIREWALL} ] start... [ %02d ]" "$COUNT"; sleep 1; done; echo ""
 
     echo ""
+    echo "Pushing rsyslog client configuration files..."
+    echo "./conf/general/rsyslog.conf    --->   $1/etc/rsyslog.conf"
+    lxc file push ./conf/general/rsyslog.conf $1/etc/rsyslog.conf
+    echo "./conf/general/logrotate.conf    --->   $1/etc/logrotate.conf"
+    lxc file push ./conf/general/logrotate.conf $1/etc/logrotate.conf
+
+    echo ""
     echo "Pushing configuration files..."
     echo "./conf/${NAME_FIREWALL}/interfaces    --->   ${NAME_FIREWALL}/etc/network/interfaces"
     lxc file push ./conf/${NAME_FIREWALL}/interfaces ${NAME_FIREWALL}/etc/network/interfaces
@@ -182,8 +189,20 @@ generate_container()
     lxc exec $1 -- adduser --disabled-password --gecos "" $1_user
 
     echo ""
+    echo "Pushing rsyslog client configuration files..."
+    echo "./conf/general/rsyslog.conf    --->   $1/etc/rsyslog.conf"
+    lxc file push ./conf/general/rsyslog.conf $1/etc/rsyslog.conf
+    echo "./conf/general/logrotate.conf    --->   $1/etc/logrotate.conf"
+    lxc file push ./conf/general/logrotate.conf $1/etc/logrotate.conf
+
+    echo ""
+    echo "Updating packages list"
+    lxc exec $1 -- apt-get update
+    
+    echo ""
     echo "Executing custom setup on [ $1 ]"
     case $1 in
+
         ## SSH Container
         ${NAME_SSH})
 
@@ -236,7 +255,7 @@ generate_container()
             lxc file push ./conf/$1/index.html $1/usr/share/nginx/html/index.html
         ;;
 
-        # Proxy Containers
+        # Proxy Container
         ${NAME_PROXY})
 
             echo ""
@@ -256,6 +275,36 @@ generate_container()
             lxc file push ./conf/$1/$1_nginx.crt $1/etc/nginx/ssl/
             echo "./conf/$1/default    --->   $1/etc/nginx/sites-enabled/"
             lxc file push ./conf/$1/default $1/etc/nginx/sites-enabled/
+        ;;
+
+        # Log Server Container
+        ${NAME_LOG})
+
+            echo ""
+            echo "Installing apache2 libapache2-mod-php mysql-server php7.0-mysql php7.0 php7.0-mysql php7.0-curl php7.0-gd php7.0-json php7.0-opcache php7.0-xml mcrypt php7.0-mcrypt"
+            lxc exec $1 -- /usr/bin/apt install -y apache2 libapache2-mod-php mysql-server php7.0-mysql php7.0 php7.0-mysql php7.0-curl php7.0-gd php7.0-json php7.0-opcache php7.0-xml mcrypt php7.0-mcrypt
+
+            echo ""
+            echo "Installing loganalyzer"
+            echo "./conf/$1/loganalyzer-4.1.6.tar.gz    --->   $1/tmp/"
+            lxc file push ./conf/$1/loganalyzer-4.1.6.tar.gz $1/tmp/
+            echo "Extracting loganalyzer package"
+            lxc exec $1 -- tar -xzvf /tmp/loganalyzer-4.1.6.tar.gz -C /tmp
+            echo "Copying source content to loganalyzer package"
+            lxc exec $1 -- cp -rf /tmp/loganalyzer-4.1.6/src /var/www/html/loganalyzer
+            echo "./conf/$1/config.php    --->   $1/var/www/html/loganalyzer/config.php"
+            lxc file push ./conf/$1/config.php $1/var/www/html/loganalyzer/config.php
+            echo "Setting up owner for config.php"
+            lxc exec $1 -- chown $1_user:$1_user /var/www/html/loganalyzer/config.php
+            echo "Setting up permission for config.php"
+            lxc exec $1 -- chmod 666 /var/www/html/loganalyzer/config.php
+            echo "Setting up owner for loganalyzer directory"
+            lxc exec $1 -- chown $1_user:$1_user -R /var/www/html/loganalyzer/
+
+            echo ""
+            echo "Pushing rsyslog server configuration files..."
+            echo "./conf/$1/rsyslog.conf    --->   $1/etc/rsyslog.conf"
+            lxc file push ./conf/$1/rsyslog.conf $1/etc/rsyslog.conf
         ;;
     esac
 

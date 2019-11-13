@@ -42,7 +42,28 @@ server {
     # SSL Key
     ssl_certificate_key /etc/nginx/ssl/proxy_nginx.key;
 
+    # Load Balancer using 'load_balancer' upstream
     location / {
         proxy_pass http://load_balancer;
+    }
+
+    # Load Balancer using 'load_balancer' upstream
+    location /www {
+        proxy_pass http://load_balancer;
+    }
+
+    # Reverse proxy for WWW1 Web Server
+    location /www1 {
+        proxy_pass http://172.0.30.10/;
+    }
+
+    # Reverse proxy for WWW2 Web Server
+    location /www2 {
+        proxy_pass http://172.0.30.20/;
+    }
+
+    # Reverse proxy for Loganalyzer Server
+    location /log {
+        proxy_pass http://172.0.20.10/loganalyzer;
     }
 }
