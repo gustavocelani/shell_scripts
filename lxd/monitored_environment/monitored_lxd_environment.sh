@@ -7,7 +7,7 @@
 #    Description:  Monitored LXD Environment General Script.
 #                  Run as super user.
 #
-#        Version:  1.2
+#        Version:  1.3
 #        Created:  08/10/2019 17:12:36 PM
 #       Revision:  1
 #
@@ -44,41 +44,6 @@ print_logo()
     echo " | || |\\  |  _|    ___) |/ / |__   _|"
     echo "|___|_| \\_|_|     |____//_/     |_|  "
     echo ""
-}
-
-
-#
-# Generates a Debian Base Container
-#
-generate_container_base()
-{
-    clear
-    print_logo
-
-    echo ""
-	echo "Generate Container ${NAME_BASE}"
-
-    echo "Initializing [ ${NAME_BASE} ] with Debian Stretch"
-    lxc init images:debian/stretch ${NAME_BASE}
-
-    start_container ${NAME_BASE}
-
-    echo ""
-    for COUNT in {5..0}; do printf "\rWaiting to [ ${NAME_BASE} ] start... [ %02d ]" "$COUNT"; sleep 1; done; echo ""
-
-    echo ""
-    echo "Updating [ ${NAME_BASE} ]"
-    lxc exec ${NAME_BASE} -- /usr/bin/apt update
-
-    echo ""
-    echo "Installing custom packages on [ ${NAME_BASE} ]"
-    lxc exec ${NAME_BASE} -- /usr/bin/apt install -y tcpdump apt-utils aptitude net-tools inetutils-ping traceroute iptables htop bind9-host dnsutils links vim openssh-server rsyslog
-
-    echo ""
-    echo "Setting up timezone to [ America/Sao_Paulo ]"
-    lxc exec ${NAME_BASE} -- timedatectl set-timezone "America/Sao_Paulo"
-
-    power_off_container ${NAME_BASE}
 }
 
 
@@ -135,10 +100,26 @@ generate_container_firewall()
 
     echo ""
     echo "Pushing rsyslog client configuration files..."
-    echo "./conf/general/rsyslog.conf    --->   $1/etc/rsyslog.conf"
-    lxc file push ./conf/general/rsyslog.conf $1/etc/rsyslog.conf
-    echo "./conf/general/logrotate.conf    --->   $1/etc/logrotate.conf"
-    lxc file push ./conf/general/logrotate.conf $1/etc/logrotate.conf
+    echo "./conf/general/rsyslog.conf    --->   ${NAME_FIREWALL}/etc/rsyslog.conf"
+    lxc file push ./conf/general/rsyslog.conf ${NAME_FIREWALL}/etc/rsyslog.conf
+    echo "./conf/general/logrotate.conf    --->   ${NAME_FIREWALL}/etc/logrotate.conf"
+    lxc file push ./conf/general/logrotate.conf ${NAME_FIREWALL}/etc/logrotate.conf
+
+    echo ""
+    echo "./conf/general/zabbix-release_4.4-1+stretch_all.deb    --->   ${NAME_FIREWALL}/tmp/"
+    lxc file push ./conf/general/zabbix-release_4.4-1+stretch_all.deb ${NAME_FIREWALL}/tmp/
+    echo "Installing zabbix 4.4.1"
+    lxc exec ${NAME_FIREWALL} -- dpkg -i /tmp/zabbix-release_4.4-1+stretch_all.deb
+    echo "Updating packages"
+    lxc exec ${NAME_FIREWALL} -- apt-get update
+
+    echo ""
+    echo "Installing zabbix-agent"
+    lxc exec ${NAME_FIREWALL} -- apt-get install -y zabbix-agent
+    echo "Enabling zabbix-agent on startup"
+    lxc exec ${NAME_FIREWALL} -- update-rc.d zabbix-agent enable
+    echo "./conf/general/zabbix_agentd.conf    --->   ${NAME_FIREWALL}/etc/zabbix/zabbix_agentd.conf"
+    lxc file push ./conf/general/zabbix_agentd.conf ${NAME_FIREWALL}/etc/zabbix/zabbix_agentd.conf --mode 0644
 
     echo ""
     echo "Pushing configuration files..."
@@ -196,8 +177,20 @@ generate_container()
     lxc file push ./conf/general/logrotate.conf $1/etc/logrotate.conf
 
     echo ""
-    echo "Updating packages list"
+    echo "./conf/general/zabbix-release_4.4-1+stretch_all.deb    --->   $1/tmp/"
+    lxc file push ./conf/general/zabbix-release_4.4-1+stretch_all.deb $1/tmp/
+    echo "Installing zabbix 4.4.1"
+    lxc exec $1 -- dpkg -i /tmp/zabbix-release_4.4-1+stretch_all.deb
+    echo "Updating packages"
     lxc exec $1 -- apt-get update
+
+    echo ""
+    echo "Installing zabbix-agent"
+    lxc exec $1 -- apt-get install -y zabbix-agent
+    echo "Enabling zabbix-agent on startup"
+    lxc exec $1 -- update-rc.d zabbix-agent enable
+    echo "./conf/general/zabbix_agentd.conf    --->   $1/etc/zabbix/zabbix_agentd.conf"
+    lxc file push ./conf/general/zabbix_agentd.conf $1/etc/zabbix/zabbix_agentd.conf --mode 0644
     
     echo ""
     echo "Executing custom setup on [ $1 ]"
@@ -306,6 +299,36 @@ generate_container()
             echo "./conf/$1/rsyslog.conf    --->   $1/etc/rsyslog.conf"
             lxc file push ./conf/$1/rsyslog.conf $1/etc/rsyslog.conf
         ;;
+
+        # Gerencia Server Container
+        ${NAME_GERENCIA})
+
+            echo ""
+            echo "Updating package sources list"
+            echo "./conf/$1/sources.list    --->   $1/etc/apt/sources.list"
+            lxc file push ./conf/$1/sources.list $1/etc/apt/sources.list --mode 0755
+            echo "Updating packages"
+            lxc exec $1 -- apt-get update
+            echo "Upgrading packages"
+            lxc exec $1 -- apt-get upgrade -y
+
+            echo "Installing zabbix-server-mysql"
+            lxc exec $1 -- apt-get install -y zabbix-server-mysql
+            echo "./conf/$1/zabbix_server.conf    --->   $1/etc/zabbix/zabbix_server.conf"
+            lxc file push ./conf/$1/zabbix_server.conf $1/etc/zabbix/zabbix_server.conf --mode 0644
+
+            echo ""
+            echo "Installing zabbix-frontend-php zabbix-apache-conf"
+            lxc exec $1 -- apt-get install -y zabbix-frontend-php zabbix-apache-conf
+            echo "./conf/$1/php.ini    --->   $1/etc/php/7.0/apache2/php.ini"
+            lxc file push ./conf/$1/php.ini $1/etc/php/7.0/apache2/php.ini --mode 0644
+            echo "./conf/$1/zabbix_db_setup.sh    --->   $1/root/"
+            lxc file push ./conf/$1/zabbix_db_setup.sh $1/root/ --mode 0755
+
+            echo ""
+            echo "Setting up Zabbix Database"
+            lxc exec $1 -- /root/zabbix_db_setup.sh
+        ;;
     esac
 
     echo ""
@@ -372,37 +395,6 @@ configure_ssh_keys()
 
 
 #
-# Removes a container
-# $1: Container Name
-#
-remove_container()
-{
-    clear
-    print_logo
-
-    power_off_container $1
-    for COUNT in {3..0}; do printf "\rWaiting to [ $1 ] power off... [ %02d ]" "$COUNT"; sleep 1; done; echo ""
-
-    echo "Removing [ $1 ]"
-    lxc delete $1
-}
-
-
-#
-# Removes a network
-# $1: Network Name
-#
-remove_network()
-{
-    clear
-    print_logo
-
-    echo "Removing [ $1 ]"
-    lxc network delete $1
-}
-
-
-#
 # Power off a Container
 # $1 Container Name
 #
@@ -440,73 +432,7 @@ environment_list()
 
     echo ""
     read -p "Press enter to continue..."
-}
-
-
-#
-# Remove Environment
-#
-remove_environment()
-{
-    clear
-    print_logo
-
     echo ""
-    echo "Remove Environment"
-
-    remove_container ${NAME_FIREWALL}
-    remove_container ${NAME_WWW1}
-    remove_container ${NAME_WWW2}
-    remove_container ${NAME_LOG}
-    remove_container ${NAME_GERENCIA}
-    remove_container ${NAME_SSH}
-    remove_container ${NAME_PROXY}
-
-    remove_network ${NETWORK_DMZ}
-    remove_network ${NETWORK_SERVERS}
-    remove_network ${NETWORK_WEB}
-}
-
-
-#
-# Stop Environment
-#
-stop_environment()
-{
-    clear
-    print_logo
-
-    echo ""
-    echo "Stop Environment"
-
-    power_off_container ${NAME_FIREWALL}
-    power_off_container ${NAME_WWW1}
-    power_off_container ${NAME_WWW2}
-    power_off_container ${NAME_LOG}
-    power_off_container ${NAME_GERENCIA}
-    power_off_container ${NAME_SSH}
-    power_off_container ${NAME_PROXY}
-}
-
-
-#
-# Start Environment
-#
-start_environment()
-{
-    clear
-    print_logo
-
-    echo ""
-    echo "Start Environment"
-
-    start_container ${NAME_FIREWALL}
-    start_container ${NAME_WWW1}
-    start_container ${NAME_WWW2}
-    start_container ${NAME_LOG}
-    start_container ${NAME_GERENCIA}
-    start_container ${NAME_SSH}
-    start_container ${NAME_PROXY}
 }
 
 
@@ -515,34 +441,6 @@ start_environment()
 ################################################################################
 clear
 print_logo
-
-
-################################################################################
-# Remove Environment
-################################################################################
-# remove_environment
-# exit
-
-
-################################################################################
-# Stop Environment
-################################################################################
-# stop_environment
-# exit
-
-
-################################################################################
-# Start Environment
-################################################################################
-# start_environment
-# exit
-
-
-################################################################################
-# Generate Container Base
-################################################################################
-# generate_container_base
-# exit
 
 
 ################################################################################
@@ -701,4 +599,3 @@ configure_ssh_keys
 ################################################################################
 
 environment_list
-echo ""

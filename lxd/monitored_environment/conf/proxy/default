@@ -66,4 +66,9 @@ server {
     location /log {
         proxy_pass http://172.0.20.10/loganalyzer;
     }
+
+    # Reverse proxy for Zabbix Server
+    location /gerencia {
+        proxy_pass http://172.0.20.20/zabbix;
+    }
 }

@@ -16,7 +16,7 @@
 	#    Description:  Monitored LXD Environment General Script.
 	#                  Run as super user.
 	#
-	#        Version:  1.2
+	#        Version:  1.3
 	#        Created:  08/10/2019 17:12:36 PM
 	#       Revision:  1
 	#
@@ -34,19 +34,24 @@
 This machine is on DMZ network that has access to internet under firewall rules. It is responsable to access all another machines using SSHv2.
 
 
-### WWW1 and WWW2
-
-This machines are on WEB network that has no access to internet under firewall rules. Each one provides a HTTP Web Server on port 80 powered by Nginx.
-
-
 ### Proxy
 
 This machine is on DMZ network that has access to internet under firewall rules. It provides a HTTPS Reverse Proxy with Load Balancer on port 443 powered by Nginx.
 
 
+### WWW1 and WWW2
+
+This machines are on WEB network that has no access to internet under firewall rules. Each one provides a HTTP Web Server on port 80 powered by Nginx.
+
+
 ### Log Server
 
 This machine is on SERVERS network that has no access to internet under firewall rules. It provides a centralized log server powered by Rsyslog and LogAnalyzer.
+
+
+### Log Server
+
+This machine is on SERVERS network that has no access to internet under firewall rules. It provides a centralized network management server powered by Zabbix.
 
 
 ## Hardening
@@ -71,10 +76,6 @@ This machine is on SERVERS network that has no access to internet under firewall
 	- Alias to watch logs: `$ log-fail2ban`
 - Firewall rules
 
-
-### WWW1 and WWW2
-
-* Firewall rules
 
 #### Proxy
 
@@ -254,4 +255,6 @@ From host machine:
 	- `https://172.0.10.20/www2`
 - LogAnalyzer
 	- `https://172.0.10.20/log`
+- Zabbix
+	- `https://172.0.10.20/gerencia`
 
