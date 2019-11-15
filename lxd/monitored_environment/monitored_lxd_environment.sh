@@ -7,7 +7,7 @@
 #    Description:  Monitored LXD Environment General Script.
 #                  Run as super user.
 #
-#        Version:  1.3
+#        Version:  1.4
 #        Created:  08/10/2019 17:12:36 PM
 #       Revision:  1
 #
@@ -183,14 +183,19 @@ generate_container()
     lxc exec $1 -- dpkg -i /tmp/zabbix-release_4.4-1+stretch_all.deb
     echo "Updating packages"
     lxc exec $1 -- apt-get update
+    echo "Upgrading packages"
+    lxc exec $1 -- apt-get upgrade -y
 
-    echo ""
-    echo "Installing zabbix-agent"
-    lxc exec $1 -- apt-get install -y zabbix-agent
-    echo "Enabling zabbix-agent on startup"
-    lxc exec $1 -- update-rc.d zabbix-agent enable
-    echo "./conf/general/zabbix_agentd.conf    --->   $1/etc/zabbix/zabbix_agentd.conf"
-    lxc file push ./conf/general/zabbix_agentd.conf $1/etc/zabbix/zabbix_agentd.conf --mode 0644
+    if [[ "$1" != "${NAME_GERENCIA}" ]]
+    then
+        echo ""
+        echo "Installing zabbix-agent"
+        lxc exec $1 -- apt-get install -y zabbix-agent
+        echo "Enabling zabbix-agent on startup"
+        lxc exec $1 -- update-rc.d zabbix-agent enable
+        echo "./conf/general/zabbix_agentd.conf    --->   $1/etc/zabbix/zabbix_agentd.conf"
+        lxc file push ./conf/general/zabbix_agentd.conf $1/etc/zabbix/zabbix_agentd.conf --mode 0644
+    fi
     
     echo ""
     echo "Executing custom setup on [ $1 ]"
@@ -222,6 +227,8 @@ generate_container()
             lxc file push ./conf/$1/jail.local $1/etc/fail2ban/
             echo "./conf/$1/fail2ban.local    --->   $1/etc/fail2ban/"
             lxc file push ./conf/$1/fail2ban.local $1/etc/fail2ban/
+            echo "Setting up fail2ban logfile ownership"
+            lxc exec $1 -- chown $1_user:$1_user /var/log/fail2ban.log
             echo "Restarting fail2ban service"
             lxc exec $1 -- service fail2ban restart
 
@@ -328,6 +335,12 @@ generate_container()
             echo ""
             echo "Setting up Zabbix Database"
             lxc exec $1 -- /root/zabbix_db_setup.sh
+
+            echo ""
+            echo "Installing zabbix-agent"
+            lxc exec $1 -- apt-get install -y zabbix-agent
+            echo "Enabling zabbix-agent on startup"
+            lxc exec $1 -- update-rc.d zabbix-agent enable
         ;;
     esac
 
