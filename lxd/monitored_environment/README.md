@@ -29,7 +29,7 @@ This machines are on WEB network that has no access to internet under firewall r
 This machine is on SERVERS network that has no access to internet under firewall rules. It provides a centralized log server powered by Rsyslog and LogAnalyzer.
 
 
-### Log Server
+### Gerencia Server
 
 This machine is on SERVERS network that has no access to internet under firewall rules. It provides a centralized network management server powered by Zabbix.
 
